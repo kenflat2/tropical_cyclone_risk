@@ -69,7 +69,7 @@ These parameters configure track and intensity constants.
 # length as the number of levels.
 steering_levels = [250, 850]
 steering_coefs = [0.2, 0.8]           # constant steering coefficients if not coupled
-coupled_track = True                  # track coupled to intensity; overrides alpha
+coupled_track = False                 # track coupled to intensity; overrides alpha
 y_alpha = [0.17, 0.83]                # value of steering coefficient at 0 knots
 m_alpha = [0.0025, -0.0025]           # change of each coefficient per unit storm intensity, 1 / kts
 alpha_max = [0.41, 0.78]              # maximum value of each steering coefficient (coupled track only)
@@ -117,4 +117,3 @@ basin_bounds = {'EP': ['180E', '0N', '290E', '60N'],
                 'SP': ['180E', '45S', '250E', '0S'],
                 'WP': ['100E', '0N', '180E', '60N'],
                 'GL': ['0E', '90S', '360E', '90N']}
-

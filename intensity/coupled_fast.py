@@ -15,6 +15,11 @@ from thermo import thermo
 from track import bam_track, env_wind
 from util import constants
 
+# maybe delete
+# import multiprocessing
+
+# log_lock = multiprocessing.Lock()
+
 class Coupled_FAST(bam_track.BetaAdvectionTrack):
     def __init__(self, fn_wnd_stat, basin, dt_start, dt_s, total_time_s):
         super().__init__(fn_wnd_stat, basin, dt_start, dt_s, total_time_s)
@@ -30,6 +35,8 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
         self.f_bath = geo.read_bathy(basin)
         self.f_land = geo.read_land(basin)
         self.debug = False
+
+        # self.env_var_log = []
 
     """ Return if over land (True) or ocean (False) """
     def _get_over_land(self, clon, clat):
@@ -143,6 +150,7 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
         alpha = self._calc_alpha(clon, clat, v_trans, v)
         gamma = self._calc_gamma(alpha)
         beta = self._calc_beta()
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             dvdt = (0.5 * self.Ck / self.h_bl * (alpha * beta * (v_pot ** 2) * (m ** 3) -
@@ -198,6 +206,18 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
         v_bam, env_wnds = self._step_bam_track(y[0], y[1], t, steering_coefs)
         dLondt = v_bam[0] / constants.earth_R * 180. / np.pi / (np.cos(y[1] * np.pi / 180.))
         dLatdt = v_bam[1] / constants.earth_R * 180. / np.pi
+
+        """
+        # Compute and store these variables for later use.
+        clon, clat, v, m = y[0], y[1], y[2], y[3]
+
+        v_pot = self._get_current_vpot(clon, clat)
+        alpha = self._calc_alpha(clon, clat, v_bam, v)
+        venti = self._calc_venti(t, clon, clat, env_wnds)
+        # print(f"{alpha}, {v_pot}, {venti}")
+
+        self.env_var_log.append([t, clon, clat, v, m, alpha, v_pot, venti])
+        """
 
         dvdt = self._dvdt(*y, v_bam, env_wnds, t)
         dmdt = self._dmdt(*y, env_wnds, t)
@@ -261,7 +281,12 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
             m_init = self._init_m(np.asarray([clon, clat, v]), 0)
         else:
             m_init = m
+
+        self.env_var_log = []
+        
+        # with log_lock:
         res = solve_ivp(self.dydt, (0, self.total_time), np.asarray([clon, clat, v, m_init]),
                         t_eval = np.linspace(0, self.total_time, self.total_steps),
                         events = tc_dissipates, max_step = 86400)
+
         return res

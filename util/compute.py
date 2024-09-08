@@ -202,11 +202,44 @@ def run_tracks(year, n_tracks, b):
                 tc_env_wnds[nt, i, :] = fast._env_winds(track_lon[i], track_lat[i], fast.t_s[i])     
             vmax = tc_wind.axi_to_max_wind(track_lon, track_lat, fast.dt_track,
                                            v_track, tc_env_wnds[nt, 0:n_time, :])
+            # print(vmax)
+            # print(track_lon)
             if np.nanmax(vmax) >= namelist.seed_vmax_threshold_ms:
                 tc_vmax[nt, 0:n_time] = vmax
                 tc_month[nt] = month_seed
                 tc_basin[nt] = basin_ids[basin_idx]
                 nt += 1
+
+                # if the track is a TC, then save a file with all the environmental parameters included.
+                tc_the_ultimate = np.zeros((len(track_lon), 7))
+                tc_the_ultimate[:, 0] = track_lon
+                tc_the_ultimate[:, 1] = track_lat
+                tc_the_ultimate[:, 2] = v_track
+                tc_the_ultimate[:, 3] = m_track
+
+                for i in range(len(track_lon)):
+                    clon = track_lon[i]
+                    clat = track_lat[i]
+                    v = v_track[i]
+                    m = m_track[i]
+                    t = fast.t_s[i]
+                    steering_coefficients = fast._calc_steering_coefs(v)
+
+                    v_bam, env_wind_tmp = fast._step_bam_track(clon, clat, t, steering_coefficients)
+                    # env_wind_tmp = tc_env_wnds[nt, i, :]
+
+                    alpha = fast._calc_alpha(clon, clat, v_bam, v)
+                    v_pot = fast._get_current_vpot(clon, clat)
+                    venti = fast._calc_venti(t, clon, clat, env_wind_tmp)
+
+                    tc_the_ultimate[i, 4:] = np.array([alpha, v_pot, venti])
+
+                np.savetxt(f"tc_{(year - namelist.start_year) * n_tracks + nt}.csv", tc_the_ultimate, header="lon,lat,v,m,alpha,vpot,venti")
+        
+                # output the environmental variables for the track
+                # np.savetxt(f"tc_env_{gen_lon}_{gen_lat}.csv", np.array(fast.env_var_log, dtype=object))
+                    
+
     return((tc_lon, tc_lat, tc_v, tc_m, tc_vmax, tc_env_wnds, tc_month, tc_basin, n_seeds))
 
 """
@@ -242,7 +275,7 @@ def run_downscaling(basin_id):
     n_seeds = np.array([x[8] for x in out])
 
     total_time_s = namelist.total_track_time_days*24*60*60
-    n_steps_output = int(total_time_s / namelist.output_interval_s) + 1
+    n_steps_output = int(total_time_s / namelist. output_interval_s) + 1
     ts_output = np.linspace(0, total_time_s, n_steps_output)
     yr_trks = np.stack([[x[0]] for x in f_args]).flatten()
     basin_ids = sorted([k for k in namelist.basin_bounds if k != 'GL'])
