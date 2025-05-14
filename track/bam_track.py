@@ -35,11 +35,17 @@ Seed the generator. Advantage of this method is that processes that
 run close to each other will have very different seeds.
 """
 def random_seed():
+    # KENNETH UPDATE: To ensure consistency in synthetic environmental variables across model runs, we fix the seed.
+    np.random.seed(9247)
+
+    # Jonathan's original code
+    """
     t = int(time.time() * 1000.0)
     np.random.seed(((t & 0xff000000) >> 24) +
                    ((t & 0x00ff0000) >>  8) +
                    ((t & 0x0000ff00) <<  8) +
                    ((t & 0x000000ff) << 24))
+    """
 
 class BetaAdvectionTrack:
     """
@@ -122,7 +128,6 @@ class BetaAdvectionTrack:
         try:
             wnd_A = np.linalg.cholesky(wnd_cov)
         except np.linalg.LinAlgError as err:
-            print(self.dt_start)
             return np.zeros(self.nWLvl)
         wnds = wnd_mean + np.matmul(wnd_A, self.Fs_i(ts))
         return wnds

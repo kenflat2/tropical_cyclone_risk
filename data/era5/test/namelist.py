@@ -31,7 +31,7 @@ var_keys = {'ERA5': {'sst': 'sst', 'mslp': 'sp', 'temp': 't',
                     'lvl': 'plev', 'lon': 'lon', 'lat': 'lat'}}
 
 ########################### Parallelism Parameters ##########################
-n_procs = 16              # number of processes to use in dask
+n_procs = 1              # number of processes to use in dask
 
 ############################ TC Risk Parameters #############################
 """
@@ -45,9 +45,9 @@ end_month = 12                        # month of end_year to stop downscaling
 """
 These parameters configure the output.
 """
-output_interval_s = 3600              # output interval of tracks, seconds (does not change time integration)
+output_interval_s = 3600 * 6              # output interval of tracks, seconds (does not change time integration)
 total_track_time_days = 15            # total time to integrate tracks, days
-tracks_per_year = 20                  # total number of tracks to simulate per year
+tracks_per_year = 1000                   # total number of tracks to simulate per year
 
 """
 These parameters configure thermodynamics and thermodynamic constants.

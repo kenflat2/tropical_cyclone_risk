@@ -148,7 +148,7 @@ def run_tracks(year, n_tracks, b):
                 gen_lat = np.random.uniform(b_bounds[1], b_bounds[3], 1)[0]
 
             # Randomly seed the month.
-            month_seed = np.random.randint(1, 13)
+            month_seed = 8 # np.random.randint(1, 13)
             fast = cpl_fast[month_seed - 1]
 
             # Find basin of genesis location and switch H_bl.
@@ -173,7 +173,16 @@ def run_tracks(year, n_tracks, b):
         rh_init = float(m_init_fx[month_seed-1].ev(gen_lon, gen_lat))
         m_init = np.maximum(0, namelist.f_mInit(rh_init))
         fast.h_bl = namelist.atm_bl_depth[basin_ids[basin_idx]]
+        print(f"Seed {nt} for year {year} and month {month_seed} in basin {basin_ids[basin_idx]}")
+        print(f"Genesis location: {gen_lon}, {gen_lat}, v_init: {v_init}, m_init: {m_init}")
         res = fast.gen_track(gen_lon, gen_lat, v_init, m_init)
+
+        # Seed the generator so initial conditions are random. Seed during integration is fixed to another value.
+        t = int(time.time() * 1000.0)
+        np.random.seed(((t & 0xff000000) >> 24) +
+                    ((t & 0x00ff0000) >>  8) +
+                    ((t & 0x0000ff00) <<  8) +
+                    ((t & 0x000000ff) << 24))
 
         is_tc = False
         if res != None:
@@ -210,34 +219,39 @@ def run_tracks(year, n_tracks, b):
                 tc_basin[nt] = basin_ids[basin_idx]
                 nt += 1
 
-                # if the track is a TC, then save a file with all the environmental parameters included.
-                tc_the_ultimate = np.zeros((len(track_lon), 7))
-                tc_the_ultimate[:, 0] = track_lon
-                tc_the_ultimate[:, 1] = track_lat
-                tc_the_ultimate[:, 2] = v_track
-                tc_the_ultimate[:, 3] = m_track
+                if year == 2017:
+                    ## Kenneth's addition to save the environmental variables for the track
+                    # if the track is a TC, then save a file with all the environmental parameters included.
+                    tc_the_ultimate = np.zeros((len(track_lon), 7))
+                    tc_the_ultimate[:, 0] = track_lon
+                    tc_the_ultimate[:, 1] = track_lat
+                    tc_the_ultimate[:, 2] = v_track
+                    tc_the_ultimate[:, 3] = m_track
 
-                for i in range(len(track_lon)):
-                    clon = track_lon[i]
-                    clat = track_lat[i]
-                    v = v_track[i]
-                    m = m_track[i]
-                    t = fast.t_s[i]
-                    steering_coefficients = fast._calc_steering_coefs(v)
+                    for i in range(len(track_lon)):
+                        clon = track_lon[i]
+                        clat = track_lat[i]
+                        v = v_track[i]
+                        m = m_track[i]
+                        t = fast.t_s[i]
+                        steering_coefficients = fast._calc_steering_coefs(v)
 
-                    v_bam, env_wind_tmp = fast._step_bam_track(clon, clat, t, steering_coefficients)
-                    # env_wind_tmp = tc_env_wnds[nt, i, :]
+                        v_bam, env_wind_tmp = fast._step_bam_track(clon, clat, t, steering_coefficients)
+                        # env_wind_tmp = tc_env_wnds[nt, i, :]
 
-                    alpha = fast._calc_alpha(clon, clat, v_bam, v)
-                    v_pot = fast._get_current_vpot(clon, clat)
-                    venti = fast._calc_venti(t, clon, clat, env_wind_tmp)
+                        alpha = fast._calc_alpha(clon, clat, v_bam, v)
+                        v_pot = fast._get_current_vpot(clon, clat)
+                        venti = fast._calc_venti(t, clon, clat, env_wind_tmp)
 
-                    tc_the_ultimate[i, 4:] = np.array([alpha, v_pot, venti])
+                        tc_the_ultimate[i, 4:] = np.array([alpha, v_pot, venti])
 
-                np.savetxt(f"tc_{(year - namelist.start_year) * n_tracks + nt}.csv", tc_the_ultimate, header="lon,lat,v,m,alpha,vpot,venti")
-        
-                # output the environmental variables for the track
-                # np.savetxt(f"tc_env_{gen_lon}_{gen_lat}.csv", np.array(fast.env_var_log, dtype=object))
+                    np.savetxt(f"tc_6_hour/tc_{nt}.csv", tc_the_ultimate, header="lon,lat,v,m,alpha,vpot,venti")
+                    print(f"Saved track {nt} for year {year} and month {month_seed}")
+            
+                    # output the environmental variables for the track
+                    # np.savetxt(f"tc_env_{gen_lon}_{gen_lat}.csv", np.array(fast.env_var_log, dtype=object))
+
+                    ## end of Kenneth's addition
                     
 
     return((tc_lon, tc_lat, tc_v, tc_m, tc_vmax, tc_env_wnds, tc_month, tc_basin, n_seeds))

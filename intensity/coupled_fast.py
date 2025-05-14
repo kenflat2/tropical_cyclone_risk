@@ -15,11 +15,6 @@ from thermo import thermo
 from track import bam_track, env_wind
 from util import constants
 
-# maybe delete
-# import multiprocessing
-
-# log_lock = multiprocessing.Lock()
-
 class Coupled_FAST(bam_track.BetaAdvectionTrack):
     def __init__(self, fn_wnd_stat, basin, dt_start, dt_s, total_time_s):
         super().__init__(fn_wnd_stat, basin, dt_start, dt_s, total_time_s)
@@ -246,9 +241,12 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
 
     """ Generate a track with an initial position of (clon, clat),
         an initial intensity of v, and initial inner core moisture m """
-    def gen_track(self, clon, clat, v, m = None):
+    def gen_track(self, clon, clat, v, m = None, start_time=0, integration_time=None):
         # Make sure that tracks are sufficiently randomized.
         bam_track.random_seed()
+
+        if integration_time is None:
+            integration_time = self.total_time
 
         # Create the weights for the beta-advection model (across time).
         self.Fs = self.gen_synthetic_f()
@@ -256,13 +254,16 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
 
         # If the ventilation index is above some threshold, do not integrate.
         S = self._calc_S(self._env_winds(clon, clat, 0))
+        # S = self._calc_S(self._env_winds(clon, clat, start_time)) # KENNETH CHANGE: initialize the wind field at the start time
         vpot = self._get_current_vpot(clon, clat)
         chi = self._calc_chi(clon, clat)
         if vpot > 0:
-            vent_index = S * chi / vpot
-            if vent_index >= 1:
-                return None
-
+            if start_time == 0: # KENNETH CHANGE: this condition is for cyclogenesis only and is not checked in the middle of integration, so make sure that holds.
+                vent_index = S * chi / vpot
+                if vent_index >= 1:
+                    print(f"Ventilation index too high. {start_time}")
+                    return None
+        
         def tc_dissipates(t, y):
             if not self.basin.in_basin(y[0], y[1], 1):
                 # Do not let the track wander outside the basin.
@@ -270,9 +271,18 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
             elif np.abs(y[1]) <= 2:
                 # Do not let the track wander too equatorward.
                 return 0
+            elif y[2] > 1e2 or y[3] > 1.0 or y[2] < 0 or y[3] < 0: # KENNETH CHANGE
+                # If the intensity becomes too high, stop the track.
+                print("Solution exploded.")
+                return 0
             else:
                 # stopping point when TC reaches 4 m/s
-                return np.maximum(0, y[2] - 4)
+                # KENNETH CHANGE: We normalized the intensity to have std 0.2, so we need to multiply by 0.013557024233180816 to get the
+                if (y[2] / 0.013557024233180816) < 4:
+                    print("TC dissipated.")
+                return np.maximum(0, (y[2] / 0.013557024233180816) - 4)
+                # ORIGINAL:
+                # return np.maximum(0, y[2] - 4)
         tc_dissipates.terminal = True
 
         # Solve for the intensity.
@@ -284,9 +294,8 @@ class Coupled_FAST(bam_track.BetaAdvectionTrack):
 
         self.env_var_log = []
         
-        # with log_lock:
-        res = solve_ivp(self.dydt, (0, self.total_time), np.asarray([clon, clat, v, m_init]),
-                        t_eval = np.linspace(0, self.total_time, self.total_steps),
+        res = solve_ivp(self.dydt, (start_time, start_time + integration_time), np.asarray([clon, clat, v, m_init]),
+                        t_eval = np.arange(start_time, start_time + integration_time + self.dt_track, self.dt_track),
                         events = tc_dissipates, max_step = 86400)
 
         return res
